@@ -1,0 +1,29 @@
+# VAE Training Configuration
+
+# Data settings
+data:
+  data_dir: "/mnt/tim/VAE_for_Pneumonia/chest_xray"  # Path to chest_xray dataset directory
+  image_size: 224           # Image size (will be resized to image_size x image_size)
+  num_workers: 4            # Number of data loading workers
+
+# Model settings
+model:
+  latent_dim: 128           # Latent dimension size
+
+# Training settings
+training:
+  batch_size: 32            # Batch size for training
+  epochs: 50                # Number of training epochs
+  lr: 0.001                 # Learning rate (1e-3)
+  kl_weight: 1.0            # Weight for KL divergence loss
+
+# Output settings
+output:
+  output_dir: "/mnt/tim/VAE_for_Pneumonia/outputs"   # Directory to save outputs (checkpoints, samples, plots)
+  save_interval: 10         # Save checkpoint every N epochs
+  sample_interval: 5        # Generate sample images every N epochs
+
+# Device settings
+device:
+  cuda: true                # Use CUDA if available (set to false to force CPU)
+

@@ -4,6 +4,7 @@ Training script for VAE on Chest X-ray dataset
 import os
 import argparse
 import json
+import yaml
 import torch
 import torch.optim as optim
 from tqdm import tqdm
@@ -11,6 +12,40 @@ import matplotlib.pyplot as plt
 
 from vae_model import VAE, vae_loss
 from dataset import get_data_loaders
+
+
+def load_config(config_path):
+    """Load configuration from YAML file"""
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+    return config
+
+
+def merge_config_with_args(config, args):
+    """Merge config file with command-line arguments (args take precedence)"""
+    # Create a flat dictionary from nested config
+    merged = {}
+    
+    # Extract from config
+    if config:
+        merged['data_dir'] = config.get('data', {}).get('data_dir', './chest_xray')
+        merged['image_size'] = config.get('data', {}).get('image_size', 224)
+        merged['num_workers'] = config.get('data', {}).get('num_workers', 4)
+        merged['latent_dim'] = config.get('model', {}).get('latent_dim', 128)
+        merged['batch_size'] = config.get('training', {}).get('batch_size', 32)
+        merged['epochs'] = config.get('training', {}).get('epochs', 50)
+        merged['lr'] = config.get('training', {}).get('lr', 1e-3)
+        merged['kl_weight'] = config.get('training', {}).get('kl_weight', 1.0)
+        merged['output_dir'] = config.get('output', {}).get('output_dir', './outputs')
+        merged['save_interval'] = config.get('output', {}).get('save_interval', 10)
+        merged['sample_interval'] = config.get('output', {}).get('sample_interval', 5)
+    
+    # Override with command-line arguments if provided
+    for key, value in vars(args).items():
+        if value is not None and key != 'config':
+            merged[key] = value
+    
+    return argparse.Namespace(**merged)
 
 
 def train_epoch(model, train_loader, optimizer, device, kl_weight=1.0):
@@ -115,33 +150,70 @@ def plot_losses(train_losses, test_losses, save_dir):
 
 def main():
     parser = argparse.ArgumentParser(description='Train VAE on Chest X-ray dataset')
-    parser.add_argument('--data_dir', type=str, required=True,
+    
+    # Config file argument
+    parser.add_argument('--config', type=str, default='./config/train_config.yaml',
+                        help='Path to config YAML file')
+    
+    # Data arguments (optional, override config)
+    parser.add_argument('--data_dir', type=str, default=None,
                         help='Path to chest_xray dataset directory')
-    parser.add_argument('--output_dir', type=str, default='./outputs',
-                        help='Directory to save outputs')
-    parser.add_argument('--latent_dim', type=int, default=128,
-                        help='Latent dimension size')
-    parser.add_argument('--batch_size', type=int, default=32,
-                        help='Batch size for training')
-    parser.add_argument('--epochs', type=int, default=50,
-                        help='Number of training epochs')
-    parser.add_argument('--lr', type=float, default=1e-3,
-                        help='Learning rate')
-    parser.add_argument('--kl_weight', type=float, default=1.0,
-                        help='Weight for KL divergence loss')
-    parser.add_argument('--image_size', type=int, default=224,
+    parser.add_argument('--image_size', type=int, default=None,
                         help='Image size')
-    parser.add_argument('--num_workers', type=int, default=4,
+    parser.add_argument('--num_workers', type=int, default=None,
                         help='Number of data loading workers')
     
+    # Model arguments (optional, override config)
+    parser.add_argument('--latent_dim', type=int, default=None,
+                        help='Latent dimension size')
+    
+    # Training arguments (optional, override config)
+    parser.add_argument('--batch_size', type=int, default=None,
+                        help='Batch size for training')
+    parser.add_argument('--epochs', type=int, default=None,
+                        help='Number of training epochs')
+    parser.add_argument('--lr', type=float, default=None,
+                        help='Learning rate')
+    parser.add_argument('--kl_weight', type=float, default=None,
+                        help='Weight for KL divergence loss')
+    
+    # Output arguments (optional, override config)
+    parser.add_argument('--output_dir', type=str, default=None,
+                        help='Directory to save outputs')
+    parser.add_argument('--save_interval', type=int, default=None,
+                        help='Save checkpoint every N epochs')
+    parser.add_argument('--sample_interval', type=int, default=None,
+                        help='Generate sample images every N epochs')
+    
     args = parser.parse_args()
+    
+    # Load config file
+    config = None
+    if os.path.exists(args.config):
+        print(f'Loading config from {args.config}')
+        config = load_config(args.config)
+    else:
+        print(f'Config file {args.config} not found, using command-line arguments only')
+    
+    # Merge config with command-line arguments
+    args = merge_config_with_args(config, args)
     
     # Create output directory
     os.makedirs(args.output_dir, exist_ok=True)
     
+    # Print configuration
+    print('\n' + '='*50)
+    print('Training Configuration')
+    print('='*50)
+    for key, value in vars(args).items():
+        if key != 'config':
+            print(f'{key}: {value}')
+    print('='*50 + '\n')
+    
     # Save hyperparameters
+    config_dict = {k: v for k, v in vars(args).items() if k != 'config'}
     with open(os.path.join(args.output_dir, 'hyperparameters.json'), 'w') as f:
-        json.dump(vars(args), f, indent=4)
+        json.dump(config_dict, f, indent=4)
     
     # Set device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -186,12 +258,12 @@ def main():
         train_losses.append(train_loss)
         test_losses.append(test_loss)
         
-        # Save samples every 5 epochs
-        if epoch % 5 == 0 or epoch == args.epochs:
+        # Save samples
+        if epoch % args.sample_interval == 0 or epoch == args.epochs:
             save_samples(model, epoch, device, args.output_dir)
         
         # Save checkpoint
-        if epoch % 10 == 0 or epoch == args.epochs:
+        if epoch % args.save_interval == 0 or epoch == args.epochs:
             torch.save({
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),

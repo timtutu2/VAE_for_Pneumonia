@@ -9,6 +9,7 @@ import torch
 import torch.optim as optim
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import wandb
 
 from vae_model import VAE, vae_loss
 from dataset import get_data_loaders
@@ -21,34 +22,7 @@ def load_config(config_path):
     return config
 
 
-def merge_config_with_args(config, args):
-    """Merge config file with command-line arguments (args take precedence)"""
-    # Create a flat dictionary from nested config
-    merged = {}
-    
-    # Extract from config
-    if config:
-        merged['data_dir'] = config.get('data', {}).get('data_dir', './chest_xray')
-        merged['image_size'] = config.get('data', {}).get('image_size', 224)
-        merged['num_workers'] = config.get('data', {}).get('num_workers', 4)
-        merged['latent_dim'] = config.get('model', {}).get('latent_dim', 128)
-        merged['batch_size'] = config.get('training', {}).get('batch_size', 32)
-        merged['epochs'] = config.get('training', {}).get('epochs', 50)
-        merged['lr'] = config.get('training', {}).get('lr', 1e-3)
-        merged['kl_weight'] = config.get('training', {}).get('kl_weight', 1.0)
-        merged['output_dir'] = config.get('output', {}).get('output_dir', './outputs')
-        merged['save_interval'] = config.get('output', {}).get('save_interval', 10)
-        merged['sample_interval'] = config.get('output', {}).get('sample_interval', 5)
-    
-    # Override with command-line arguments if provided
-    for key, value in vars(args).items():
-        if value is not None and key != 'config':
-            merged[key] = value
-    
-    return argparse.Namespace(**merged)
-
-
-def train_epoch(model, train_loader, optimizer, device, kl_weight=1.0):
+def train_epoch(model, train_loader, optimizer, device, kl_weight=1.0, use_wandb=False):
     """Train for one epoch"""
     model.train()
     train_loss = 0
@@ -88,7 +62,7 @@ def train_epoch(model, train_loader, optimizer, device, kl_weight=1.0):
     return avg_loss, avg_recon, avg_kl
 
 
-def test_epoch(model, test_loader, device, kl_weight=1.0):
+def test_epoch(model, test_loader, device, kl_weight=1.0, use_wandb=False):
     """Test for one epoch"""
     model.eval()
     test_loss = 0
@@ -113,7 +87,7 @@ def test_epoch(model, test_loader, device, kl_weight=1.0):
     return avg_loss, avg_recon, avg_kl
 
 
-def save_samples(model, epoch, device, save_dir, num_samples=16):
+def save_samples(model, epoch, device, save_dir, num_samples=16, use_wandb=False):
     """Generate and save sample images"""
     model.eval()
     with torch.no_grad():
@@ -128,7 +102,16 @@ def save_samples(model, epoch, device, save_dir, num_samples=16):
             ax.axis('off')
         
         plt.tight_layout()
-        plt.savefig(os.path.join(save_dir, f'samples_epoch_{epoch}.png'))
+        save_path = os.path.join(save_dir, f'samples_epoch_{epoch}.png')
+        plt.savefig(save_path)
+        
+        # Log to wandb
+        if use_wandb:
+            wandb.log({
+                "generated_samples": wandb.Image(save_path),
+                "epoch": epoch
+            })
+        
         plt.close()
 
 
@@ -185,35 +168,79 @@ def main():
     parser.add_argument('--sample_interval', type=int, default=None,
                         help='Generate sample images every N epochs')
     
+    # Wandb arguments (optional, override config)
+    parser.add_argument('--use_wandb', action='store_true',
+                        help='Use Weights & Biases for logging')
+    parser.add_argument('--wandb_project', type=str, default=None,
+                        help='Wandb project name')
+    parser.add_argument('--wandb_entity', type=str, default=None,
+                        help='Wandb entity/username')
+    parser.add_argument('--wandb_name', type=str, default=None,
+                        help='Wandb run name')
+    
     args = parser.parse_args()
     
     # Load config file
-    config = None
-    if os.path.exists(args.config):
-        print(f'Loading config from {args.config}')
-        config = load_config(args.config)
-    else:
-        print(f'Config file {args.config} not found, using command-line arguments only')
+    print(f'Loading configuration from {args.config}...')
+    with open(args.config, 'r') as f:
+        config = yaml.safe_load(f)
     
-    # Merge config with command-line arguments
-    args = merge_config_with_args(config, args)
-    
-    # Create output directory
-    os.makedirs(args.output_dir, exist_ok=True)
+    # Override config with command-line arguments
+    if args.data_dir is not None:
+        config['data']['data_dir'] = args.data_dir
+    if args.image_size is not None:
+        config['data']['image_size'] = args.image_size
+    if args.num_workers is not None:
+        config['data']['num_workers'] = args.num_workers
+    if args.latent_dim is not None:
+        config['model']['latent_dim'] = args.latent_dim
+    if args.batch_size is not None:
+        config['training']['batch_size'] = args.batch_size
+    if args.epochs is not None:
+        config['training']['epochs'] = args.epochs
+    if args.lr is not None:
+        config['training']['lr'] = args.lr
+    if args.kl_weight is not None:
+        config['training']['kl_weight'] = args.kl_weight
+    if args.output_dir is not None:
+        config['output']['output_dir'] = args.output_dir
+    if args.save_interval is not None:
+        config['output']['save_interval'] = args.save_interval
+    if args.sample_interval is not None:
+        config['output']['sample_interval'] = args.sample_interval
+    if args.use_wandb:
+        config['wandb']['use_wandb'] = True
+    if args.wandb_project is not None:
+        config['wandb']['project'] = args.wandb_project
+    if args.wandb_entity is not None:
+        config['wandb']['entity'] = args.wandb_entity
+    if args.wandb_name is not None:
+        config['wandb']['name'] = args.wandb_name
     
     # Print configuration
-    print('\n' + '='*50)
-    print('Training Configuration')
-    print('='*50)
-    for key, value in vars(args).items():
-        if key != 'config':
-            print(f'{key}: {value}')
-    print('='*50 + '\n')
+    print('\nConfiguration:')
+    for key, value in config.items():
+        print(f"  {key}: {value}")
+    print()
     
-    # Save hyperparameters
-    config_dict = {k: v for k, v in vars(args).items() if k != 'config'}
-    with open(os.path.join(args.output_dir, 'hyperparameters.json'), 'w') as f:
-        json.dump(config_dict, f, indent=4)
+    # Create output directory
+    os.makedirs(config['output']['output_dir'], exist_ok=True)
+    
+    # Save configuration
+    config_save_path = os.path.join(config['output']['output_dir'], 'config.yaml')
+    with open(config_save_path, 'w') as f:
+        yaml.dump(config, f, default_flow_style=False)
+    print(f"Configuration saved to {config_save_path}\n")
+    
+    # Initialize wandb
+    if config['wandb']['use_wandb']:
+        wandb.init(
+            project=config['wandb']['project'],
+            entity=config['wandb']['entity'],
+            name=config['wandb']['name'],
+            config=config
+        )
+        print(f'Wandb initialized: {wandb.run.name}\n')
     
     # Set device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -222,33 +249,38 @@ def main():
     # Load data
     print('Loading data...')
     train_loader, test_loader = get_data_loaders(
-        args.data_dir,
-        batch_size=args.batch_size,
-        image_size=args.image_size,
-        num_workers=args.num_workers
+        config['data']['data_dir'],
+        batch_size=config['training']['batch_size'],
+        image_size=config['data']['image_size'],
+        num_workers=config['data']['num_workers']
     )
     
     # Create model
     print('Creating model...')
-    model = VAE(latent_dim=args.latent_dim).to(device)
-    optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    model = VAE(latent_dim=config['model']['latent_dim']).to(device)
+    optimizer = optim.Adam(model.parameters(), lr=config['training']['lr'])
     
     # Training loop
-    print('Starting training...')
+    print(f"\nStarting training for {config['training']['epochs']} epochs...")
+    print('='*60)
     train_losses = []
     test_losses = []
     
-    for epoch in range(1, args.epochs + 1):
-        print(f'\nEpoch {epoch}/{args.epochs}')
+    for epoch in range(1, config['training']['epochs'] + 1):
+        print(f"\nEpoch {epoch}/{config['training']['epochs']}")
         
         # Train
         train_loss, train_recon, train_kl = train_epoch(
-            model, train_loader, optimizer, device, args.kl_weight
+            model, train_loader, optimizer, device, 
+            config['training']['kl_weight'], 
+            config['wandb']['use_wandb']
         )
         
         # Test
         test_loss, test_recon, test_kl = test_epoch(
-            model, test_loader, device, args.kl_weight
+            model, test_loader, device, 
+            config['training']['kl_weight'], 
+            config['wandb']['use_wandb']
         )
         
         # Log results
@@ -258,28 +290,55 @@ def main():
         train_losses.append(train_loss)
         test_losses.append(test_loss)
         
+        # Log to wandb
+        if config['wandb']['use_wandb']:
+            wandb.log({
+                'epoch': epoch,
+                'train/loss': train_loss,
+                'train/recon_loss': train_recon,
+                'train/kl_loss': train_kl,
+                'test/loss': test_loss,
+                'test/recon_loss': test_recon,
+                'test/kl_loss': test_kl,
+            })
+        
         # Save samples
-        if epoch % args.sample_interval == 0 or epoch == args.epochs:
-            save_samples(model, epoch, device, args.output_dir)
+        if epoch % config['output']['sample_interval'] == 0 or epoch == config['training']['epochs']:
+            save_samples(model, epoch, device, config['output']['output_dir'], 
+                        use_wandb=config['wandb']['use_wandb'])
         
         # Save checkpoint
-        if epoch % args.save_interval == 0 or epoch == args.epochs:
+        if epoch % config['output']['save_interval'] == 0 or epoch == config['training']['epochs']:
+            checkpoint_path = os.path.join(config['output']['output_dir'], f'checkpoint_epoch_{epoch}.pth')
             torch.save({
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'train_loss': train_loss,
                 'test_loss': test_loss,
-            }, os.path.join(args.output_dir, f'checkpoint_epoch_{epoch}.pth'))
+            }, checkpoint_path)
+            
+            # Log checkpoint to wandb
+            if config['wandb']['use_wandb']:
+                wandb.save(checkpoint_path)
     
     # Save final model
-    torch.save(model.state_dict(), os.path.join(args.output_dir, 'vae_final.pth'))
+    final_model_path = os.path.join(config['output']['output_dir'], 'vae_final.pth')
+    torch.save(model.state_dict(), final_model_path)
     
-    # Plot loss curves
-    plot_losses(train_losses, test_losses, args.output_dir)
+    # Plot loss curves (only if not using wandb, since wandb creates them automatically)
+    if not config['wandb']['use_wandb']:
+        plot_losses(train_losses, test_losses, config['output']['output_dir'])
     
-    print('\nTraining completed!')
-    print(f'Results saved to {args.output_dir}')
+    # Save artifacts to wandb
+    if config['wandb']['use_wandb']:
+        wandb.save(final_model_path)
+        wandb.finish()
+    
+    print('\n' + '='*60)
+    print('Training completed!')
+    print(f"Results saved to {config['output']['output_dir']}")
+    print('='*60)
 
 
 if __name__ == '__main__':

@@ -27,3 +27,10 @@ output:
 device:
   cuda: true                # Use CUDA if available (set to false to force CPU)
 
+# Weights & Biases settings
+wandb:
+  use_wandb: false          # Enable Weights & Biases logging
+  project: "vae-pneumonia"  # Wandb project name
+  entity: null              # Wandb entity/username (set to your wandb username)
+  name: null                # Wandb run name (leave null for auto-generated name)
+

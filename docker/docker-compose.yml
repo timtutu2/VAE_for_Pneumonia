@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  vae-training:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: vae-pneumonia:latest
+    container_name: vae_training
+    
+    # GPU support (requires nvidia-docker)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    
+    # Mount volumes for data persistence
+    volumes:
+      # Mount your dataset directory (adjust path as needed)
+      - ${DATA_DIR:-../chest_xray}:/workspace/data:ro
+      # Mount outputs directory to persist results
+      - ../outputs:/workspace/outputs
+      # Mount evaluation directory
+      - ../evaluation:/workspace/evaluation
+      # Optional: mount code for development
+      - ../vae_model.py:/workspace/vae_model.py
+      - ../dataset.py:/workspace/dataset.py
+      - ../train.py:/workspace/train.py
+      - ../evaluate.py:/workspace/evaluate.py
+    
+    # Environment variables
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - TORCH_HOME=/workspace/.torch
+    
+    # Keep container running for interactive sessions
+    stdin_open: true
+    tty: true
+    
+    # Default command (can be overridden)
+    command: >
+      bash -c "echo 'VAE Container Ready. Use docker exec to run training or evaluation commands.' && tail -f /dev/null"
+
+  vae-cpu:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: vae-pneumonia:latest
+    container_name: vae_cpu
+    
+    # CPU-only version (no GPU)
+    volumes:
+      - ${DATA_DIR:-../chest_xray}:/workspace/data:ro
+      - ../outputs:/workspace/outputs
+      - ../evaluation:/workspace/evaluation
+      - ../vae_model.py:/workspace/vae_model.py
+      - ../dataset.py:/workspace/dataset.py
+      - ../train.py:/workspace/train.py
+      - ../evaluate.py:/workspace/evaluate.py
+    
+    stdin_open: true
+    tty: true
+    
+    profiles:
+      - cpu
+    
+    command: >
+      bash -c "echo 'VAE Container Ready (CPU mode). Use docker exec to run training or evaluation commands.' && tail -f /dev/null"
+

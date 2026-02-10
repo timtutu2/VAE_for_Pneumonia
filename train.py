@@ -91,7 +91,9 @@ def save_samples(model, epoch, device, save_dir, num_samples=16, use_wandb=False
     """Generate and save sample images"""
     model.eval()
     with torch.no_grad():
-        samples = model.sample(num_samples, device)
+        # Use the underlying model if wrapped with DataParallel
+        model_to_use = model.module if isinstance(model, torch.nn.DataParallel) else model
+        samples = model_to_use.sample(num_samples, device)
         samples = samples.cpu()
         
         # Create grid
@@ -226,6 +228,16 @@ def main():
     # Create output directory
     os.makedirs(config['output']['output_dir'], exist_ok=True)
     
+    # Set device and detect GPUs early
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    num_gpus = torch.cuda.device_count()
+    
+    # Add GPU info to config
+    config['system'] = {
+        'num_gpus': num_gpus,
+        'gpu_names': [torch.cuda.get_device_name(i) for i in range(num_gpus)] if num_gpus > 0 else []
+    }
+    
     # Save configuration
     config_save_path = os.path.join(config['output']['output_dir'], 'config.yaml')
     with open(config_save_path, 'w') as f:
@@ -242,12 +254,21 @@ def main():
         )
         print(f'Wandb initialized: {wandb.run.name}\n')
     
-    # Set device
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f'Using device: {device}')
+    # Print GPU information
+    print('='*60)
+    print('GPU Configuration:')
+    if num_gpus > 1:
+        print(f'  Found {num_gpus} GPUs! Using DataParallel for multi-GPU training')
+        for i in range(num_gpus):
+            print(f'  GPU {i}: {torch.cuda.get_device_name(i)}')
+    elif num_gpus == 1:
+        print(f'  Using single GPU: {torch.cuda.get_device_name(0)}')
+    else:
+        print('  Using CPU (no GPU available)')
+    print('='*60 + '\n')
     
     # Load data
-    print('Loading data...')
+    print('\nLoading data...')
     train_loader, test_loader = get_data_loaders(
         config['data']['data_dir'],
         batch_size=config['training']['batch_size'],
@@ -258,6 +279,13 @@ def main():
     # Create model
     print('Creating model...')
     model = VAE(latent_dim=config['model']['latent_dim']).to(device)
+    
+    # Wrap model with DataParallel if multiple GPUs are available
+    if num_gpus > 1:
+        model = torch.nn.DataParallel(model)
+        print(f'Model wrapped with DataParallel across {num_gpus} GPUs')
+        print(f'Effective batch size: {config["training"]["batch_size"]} per GPU × {num_gpus} GPUs = {config["training"]["batch_size"] * num_gpus}')
+    
     optimizer = optim.Adam(model.parameters(), lr=config['training']['lr'])
     
     # Training loop
@@ -310,9 +338,11 @@ def main():
         # Save checkpoint
         if epoch % config['output']['save_interval'] == 0 or epoch == config['training']['epochs']:
             checkpoint_path = os.path.join(config['output']['output_dir'], f'checkpoint_epoch_{epoch}.pth')
+            # Save the underlying model if using DataParallel
+            model_to_save = model.module if isinstance(model, torch.nn.DataParallel) else model
             torch.save({
                 'epoch': epoch,
-                'model_state_dict': model.state_dict(),
+                'model_state_dict': model_to_save.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'train_loss': train_loss,
                 'test_loss': test_loss,
@@ -324,7 +354,9 @@ def main():
     
     # Save final model
     final_model_path = os.path.join(config['output']['output_dir'], 'vae_final.pth')
-    torch.save(model.state_dict(), final_model_path)
+    # Save the underlying model if using DataParallel
+    model_to_save = model.module if isinstance(model, torch.nn.DataParallel) else model
+    torch.save(model_to_save.state_dict(), final_model_path)
     
     # Plot loss curves (only if not using wandb, since wandb creates them automatically)
     if not config['wandb']['use_wandb']:

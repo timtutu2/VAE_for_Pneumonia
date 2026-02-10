@@ -12,7 +12,7 @@ spec:
     spec:
       containers:
       - name: gpu-container
-        image: timttu/vae-pneumonia:v4
+        image: timttu/vae-pneumonia:v5
         command: ["/bin/bash", "-c"]
         args: [
           "set -e && \

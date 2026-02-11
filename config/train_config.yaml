@@ -29,8 +29,8 @@ device:
 
 # Weights & Biases settings
 wandb:
-  use_wandb: false          # Enable Weights & Biases logging
+  use_wandb: true           # Enable Weights & Biases logging
   project: "vae-pneumonia"  # Wandb project name
-  entity: null              # Wandb entity/username (set to your wandb username)
-  name: null                # Wandb run name (leave null for auto-generated name)
+  entity: kttu_tim-uc-san-diego           # Wandb entity/username (set to your wandb username)
+  name: pneumonia-vae                # Wandb run name (leave null for auto-generated name)
 

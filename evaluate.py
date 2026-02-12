@@ -193,7 +193,19 @@ def main():
     # Load model
     print('Loading model...')
     model = VAE(latent_dim=args.latent_dim).to(device)
-    model.load_state_dict(torch.load(args.model_path, map_location=device))
+    
+    # Load checkpoint
+    checkpoint = torch.load(args.model_path, map_location=device)
+    
+    # Handle different checkpoint formats
+    if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+        # Checkpoint saved with additional metadata (epoch, optimizer, etc.)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        print(f"Loaded checkpoint from epoch {checkpoint.get('epoch', 'unknown')}")
+    else:
+        # Checkpoint is just the state dict
+        model.load_state_dict(checkpoint)
+    
     model.eval()
     
     # Generate images

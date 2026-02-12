@@ -164,9 +164,9 @@ def compute_fid(real_dir, fake_dir, batch_size=50, device=None):
 
 def main():
     parser = argparse.ArgumentParser(description='Evaluate VAE with IS and FID')
-    parser.add_argument('--model_path', type=str, required=True, default='/mnt/tim/VAE_for_Pneumonia/outputs/checkpoint_epoch_50.pth',
+    parser.add_argument('--model_path', type=str, default='/mnt/tim/VAE_for_Pneumonia/outputs/checkpoint_epoch_50.pth',
                         help='Path to trained model checkpoint')
-    parser.add_argument('--data_dir', type=str, required=True, default='/mnt/tim/VAE_for_Pneumonia/chest_xray', #change this to the path to the dataset
+    parser.add_argument('--data_dir', type=str, default='/mnt/tim/VAE_for_Pneumonia/chest_xray',
                         help='Path to chest_xray dataset directory')
     parser.add_argument('--output_dir', type=str, default='/mnt/tim/VAE_for_Pneumonia/evaluation',
                         help='Directory to save evaluation results')

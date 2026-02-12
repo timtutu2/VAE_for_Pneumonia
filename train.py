@@ -22,7 +22,7 @@ def load_config(config_path):
     return config
 
 
-def train_epoch(model, train_loader, optimizer, device, kl_weight=1.0, use_wandb=False):
+def train_epoch(model, train_loader, optimizer, device, kl_weight=1.0, reduction='sum', use_wandb=False):
     """Train for one epoch"""
     model.train()
     train_loss = 0
@@ -36,7 +36,7 @@ def train_epoch(model, train_loader, optimizer, device, kl_weight=1.0, use_wandb
         
         # Forward pass
         recon_batch, mu, logvar = model(data)
-        loss, recon_loss, kl_loss = vae_loss(recon_batch, data, mu, logvar, kl_weight)
+        loss, recon_loss, kl_loss = vae_loss(recon_batch, data, mu, logvar, kl_weight, reduction)
         
         # Backward pass
         loss.backward()
@@ -62,7 +62,7 @@ def train_epoch(model, train_loader, optimizer, device, kl_weight=1.0, use_wandb
     return avg_loss, avg_recon, avg_kl
 
 
-def test_epoch(model, test_loader, device, kl_weight=1.0, use_wandb=False):
+def test_epoch(model, test_loader, device, kl_weight=1.0, reduction='sum', use_wandb=False):
     """Test for one epoch"""
     model.eval()
     test_loss = 0
@@ -73,7 +73,7 @@ def test_epoch(model, test_loader, device, kl_weight=1.0, use_wandb=False):
         for data in test_loader:
             data = data.to(device)
             recon_batch, mu, logvar = model(data)
-            loss, recon_loss, kl_loss = vae_loss(recon_batch, data, mu, logvar, kl_weight)
+            loss, recon_loss, kl_loss = vae_loss(recon_batch, data, mu, logvar, kl_weight, reduction)
             
             test_loss += loss.item()
             test_recon_loss += recon_loss.item()
@@ -161,6 +161,8 @@ def main():
                         help='Learning rate')
     parser.add_argument('--kl_weight', type=float, default=None,
                         help='Weight for KL divergence loss')
+    parser.add_argument('--reduction', type=str, default=None,
+                        help='Reduction type for loss calculation')
     
     # Output arguments (optional, override config)
     parser.add_argument('--output_dir', type=str, default=None,
@@ -204,6 +206,8 @@ def main():
         config['training']['lr'] = args.lr
     if args.kl_weight is not None:
         config['training']['kl_weight'] = args.kl_weight
+    if args.reduction is not None:
+        config['training']['reduction'] = args.reduction
     if args.output_dir is not None:
         config['output']['output_dir'] = args.output_dir
     if args.save_interval is not None:
@@ -218,6 +222,10 @@ def main():
         config['wandb']['entity'] = args.wandb_entity
     if args.wandb_name is not None:
         config['wandb']['name'] = args.wandb_name
+    
+    # Set default reduction if not specified (for backward compatibility)
+    if 'reduction' not in config['training']:
+        config['training']['reduction'] = 'sum'
     
     # Print configuration
     print('\nConfiguration:')
@@ -300,15 +308,17 @@ def main():
         # Train
         train_loss, train_recon, train_kl = train_epoch(
             model, train_loader, optimizer, device, 
-            config['training']['kl_weight'], 
-            config['wandb']['use_wandb']
+            kl_weight=config['training']['kl_weight'], 
+            reduction=config['training']['reduction'],
+            use_wandb=config['wandb']['use_wandb']
         )
         
         # Test
         test_loss, test_recon, test_kl = test_epoch(
             model, test_loader, device, 
-            config['training']['kl_weight'], 
-            config['wandb']['use_wandb']
+            kl_weight=config['training']['kl_weight'], 
+            reduction=config['training']['reduction'],
+            use_wandb=config['wandb']['use_wandb']
         )
         
         # Log results

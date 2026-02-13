@@ -20,7 +20,7 @@ training:
 
 # Output settings
 output:
-  output_dir: "/mnt/tim/VAE_for_Pneumonia/outputs/tanh_0.001"   # Directory to save outputs (checkpoints, samples, plots)
+  output_dir: "/mnt/tim/VAE_for_Pneumonia/outputs/mse_loss_tanh_0.001"   # Directory to save outputs (checkpoints, samples, plots)
   save_interval: 10         # Save checkpoint every N epochs
   sample_interval: 5        # Generate sample images every N epochs
 

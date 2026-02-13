@@ -20,7 +20,7 @@ training:
 
 # Output settings
 output:
-  output_dir: "/mnt/tim/VAE_for_Pneumonia/outputs"   # Directory to save outputs (checkpoints, samples, plots)
+  output_dir: "/mnt/tim/VAE_for_Pneumonia/outputs/mean_0.1"   # Directory to save outputs (checkpoints, samples, plots)
   save_interval: 10         # Save checkpoint every N epochs
   sample_interval: 5        # Generate sample images every N epochs
 

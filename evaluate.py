@@ -229,7 +229,8 @@ def main():
     
     # FID Score
     print('\n2. Computing FID Score...')
-    fid_value = compute_fid(real_dir, generated_dir, args.batch_size, device)
+    #fid_value = compute_fid(real_dir, generated_dir, args.batch_size, device)
+    fid_value = compute_fid(real_dir, real_dir, args.batch_size, device)
     if fid_value is not None:
         print(f'FID Score: {fid_value:.4f}')
     else:

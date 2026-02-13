@@ -122,8 +122,7 @@ def vae_loss(recon_x, x, mu, logvar, kl_weight=1.0, reduction='sum'):
         return recon_loss + kl_weight * kl_loss, recon_loss, kl_loss
     elif reduction == 'mean':
         # Reconstruction loss (Binary Cross Entropy)
-        #recon_loss = F.binary_cross_entropy(recon_x, x, reduction='mean')
-        recon_loss = F.mse_loss(recon_x, x, reduction='mean')
+        recon_loss = F.binary_cross_entropy(recon_x, x, reduction='mean')
         # KL divergence (per latent dimension, averaged over batch)
         kl_loss = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
         return recon_loss + kl_weight * kl_loss, recon_loss, kl_loss

@@ -164,11 +164,11 @@ def compute_fid(real_dir, fake_dir, batch_size=50, device=None):
 
 def main():
     parser = argparse.ArgumentParser(description='Evaluate VAE with IS and FID')
-    parser.add_argument('--model_path', type=str, default='/mnt/tim/VAE_for_Pneumonia/outputs/sum_1/checkpoint_epoch_50.pth',
+    parser.add_argument('--model_path', type=str, default='/mnt/tim/VAE_for_Pneumonia/outputs/mse_loss_tanh_0.005/checkpoint_epoch_80.pth',
                         help='Path to trained model checkpoint')
     parser.add_argument('--data_dir', type=str, default='/mnt/tim/VAE_for_Pneumonia/chest_xray',
                         help='Path to chest_xray dataset directory')
-    parser.add_argument('--output_dir', type=str, default='/mnt/tim/VAE_for_Pneumonia/evaluation/test_eval',
+    parser.add_argument('--output_dir', type=str, default='/mnt/tim/VAE_for_Pneumonia/evaluation/mse_loss_tanh_0.005',
                         help='Directory to save evaluation results')
     parser.add_argument('--num_generated', type=int, default=1000,
                         help='Number of images to generate')
@@ -229,8 +229,8 @@ def main():
     
     # FID Score
     print('\n2. Computing FID Score...')
-    #fid_value = compute_fid(real_dir, generated_dir, args.batch_size, device)
-    fid_value = compute_fid(real_dir, real_dir, args.batch_size, device)
+    fid_value = compute_fid(real_dir, generated_dir, args.batch_size, device)
+    #fid_value = compute_fid(real_dir, real_dir, args.batch_size, device)
     if fid_value is not None:
         print(f'FID Score: {fid_value:.4f}')
     else:

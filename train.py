@@ -11,7 +11,8 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import wandb
 
-from vae_model import VAE, vae_loss
+#from vae_model import VAE, vae_loss
+from vae_model_coun import VAE, vae_loss
 from dataset import get_data_loaders
 
 

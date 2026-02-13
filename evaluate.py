@@ -168,7 +168,7 @@ def main():
                         help='Path to trained model checkpoint')
     parser.add_argument('--data_dir', type=str, default='/mnt/tim/VAE_for_Pneumonia/chest_xray',
                         help='Path to chest_xray dataset directory')
-    parser.add_argument('--output_dir', type=str, default='/mnt/tim/VAE_for_Pneumonia/evaluation/evaluation_sum_1',
+    parser.add_argument('--output_dir', type=str, default='/mnt/tim/VAE_for_Pneumonia/evaluation/evaluation_sigmoid_sum_1',
                         help='Directory to save evaluation results')
     parser.add_argument('--num_generated', type=int, default=1000,
                         help='Number of images to generate')

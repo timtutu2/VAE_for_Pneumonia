@@ -15,7 +15,7 @@ training:
   batch_size: 32            # Batch size for training
   epochs: 80        # Number of training epochs
   lr: 0.001                 # Learning rate (1e-3)
-  kl_weight: 0.01          # Weight for KL divergence loss
+  kl_weight: 0.1          # Weight for KL divergence loss
   reduction: "mean"         # Reduction type for loss calculation
 
 # Output settings

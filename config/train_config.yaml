@@ -15,12 +15,12 @@ training:
   batch_size: 32            # Batch size for training
   epochs: 80       # Number of training epochs
   lr: 0.001                 # Learning rate (1e-3)
-  kl_weight: 0.01          # Weight for KL divergence loss
+  kl_weight: 0.005          # Weight for KL divergence loss
   reduction: "mean"         # Reduction type for loss calculation
 
 # Output settings
 output:
-  output_dir: "/mnt/tim/VAE_for_Pneumonia/outputs/mse_loss_tanh_0.01"   # Directory to save outputs (checkpoints, samples, plots)
+  output_dir: "/mnt/tim/VAE_for_Pneumonia/outputs/mse_loss_tanh_0.005"   # Directory to save outputs (checkpoints, samples, plots)
   save_interval: 10         # Save checkpoint every N epochs
   sample_interval: 5        # Generate sample images every N epochs
 
